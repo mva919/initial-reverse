@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <fcntl.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,14 +53,21 @@ int main(int argc, char *argv[]) {
 
   for (;;) {
     bytes_read = read(inputfd, buf + cur_buf_size, BUF_SIZE);
+    if (bytes_read == 0) {
+      break;
+    }
 
     if (bytes_read == -1) {
       int err = errno;
       fprintf(stderr, "error %d: could not read from file\n", err);
       exit(1);
     }
+    if (inputfd != STDIN_FILENO) {
+      lseek(inputfd, bytes_read, SEEK_CUR);
+    }
 
-    if (bytes_read == 1 && buf[cur_buf_size] == '\n') {
+    if (inputfd == STDIN_FILENO && bytes_read == 1 &&
+        buf[cur_buf_size] == '\n') {
       stack_i -= 1; // decrementing stack pointer so we always point to last
                     // item in stack
       break;
