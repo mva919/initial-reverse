@@ -65,20 +65,24 @@ int main(int argc, char *argv[]) {
       break;
     }
 
-    char *ptr = malloc(bytes_read);
+    char *ptr = malloc(bytes_read + 1); // strcpy needs size len(src) + 1 to
+                                        // insert null terminating character
     if (ptr == NULL) {
       int err = errno;
       fprintf(stderr, "error %d: allocating read string\n", err);
       exit(1);
     }
     strcpy(ptr, buf + cur_buf_size);
-    printf("size %d\n", cur_buf_size);
 
     stack[stack_i++] = ptr;
     if (stack_i == stack_size) {
       // TODO: double stack size and copy over memory to new stack
     }
     cur_buf_size = (cur_buf_size + bytes_read) % BUF_SIZE;
+  }
+
+  for (int i = (int)stack_i; i >= 0; i--) {
+    write(outputfd, stack[i], strlen(stack[i]));
   }
 
   return 0;
