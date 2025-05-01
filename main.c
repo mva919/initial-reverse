@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "error %d: allocataing initial stack\n", err);
     exit(1);
   }
-  unsigned int stack_size = 0, cur_buf_size = 0;
+  unsigned int stack_i = 0, cur_buf_size = 0, stack_size = STACK_SIZE_INC;
   int bytes_read = -1;
 
   for (;;) {
@@ -60,17 +60,25 @@ int main(int argc, char *argv[]) {
     }
 
     if (bytes_read == 1 && buf[cur_buf_size] == '\n') {
+      stack_i -= 1; // decrementing stack pointer so we always point to last
+                    // item in stack
       break;
     }
 
-    cur_buf_size = (cur_buf_size + bytes_read) % BUF_SIZE;
-    printf("size %d\n", cur_buf_size);
     char *ptr = malloc(bytes_read);
     if (ptr == NULL) {
       int err = errno;
       fprintf(stderr, "error %d: allocating read string\n", err);
       exit(1);
     }
+    strcpy(ptr, buf + cur_buf_size);
+    printf("size %d\n", cur_buf_size);
+
+    stack[stack_i++] = ptr;
+    if (stack_i == stack_size) {
+      // TODO: double stack size and copy over memory to new stack
+    }
+    cur_buf_size = (cur_buf_size + bytes_read) % BUF_SIZE;
   }
 
   return 0;
