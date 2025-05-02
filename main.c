@@ -15,12 +15,11 @@ int main(int argc, char *argv[]) {
     printf("usage: reverse <input> <output>\n");
     exit(1);
   }
-
-  int inputfd = STDIN_FILENO, outputfd = STDOUT_FILENO;
+  FILE *in_file = stdin, *out_file = stdout;
 
   if (argc > 1) {
-    inputfd = open(argv[1], O_RDONLY);
-    if (inputfd == -1) {
+    in_file = fopen(argv[1], "r");
+    if (in_file == NULL) {
       fprintf(stderr, "error: cannot open file '%s'\n", argv[1]);
       exit(1);
     }
@@ -34,63 +33,62 @@ int main(int argc, char *argv[]) {
       exit(1);
     }
 
-    outputfd = open(argv[2], O_WRONLY);
-    if (outputfd == -1) {
-      fprintf(stderr, "error: cannot open file '%s'\n", argv[2]);
+    out_file = fopen(argv[2], "w");
+    if (out_file == NULL) {
+      fprintf(stderr, "error: cannot open or create file '%s'\n", argv[2]);
       exit(1);
     }
   }
 
-  char buf[BUF_SIZE];
-  char **stack = malloc(sizeof(char *) * STACK_SIZE_INC);
+  unsigned int stack_i = 0, stack_size = STACK_SIZE_INC;
+  char **stack = malloc(sizeof(char *) * stack_size);
   if (stack == NULL) {
     int err = errno;
-    fprintf(stderr, "error %d: allocataing initial stack\n", err);
+    fprintf(stderr, "error %d: allocating initial stack\n", err);
     exit(1);
   }
-  unsigned int stack_i = 0, cur_buf_size = 0, stack_size = STACK_SIZE_INC;
-  int bytes_read = -1;
 
-  for (;;) {
-    bytes_read = read(inputfd, buf + cur_buf_size, BUF_SIZE);
-    if (bytes_read == 0) {
+  char *lineptr = NULL;
+  size_t lineptr_size = 0;
+  ssize_t chars_read;
+  while ((chars_read = getline(&lineptr, &lineptr_size, in_file)) != -1) {
+    // if we are reading from stdin and user gives empty line we stop taking in
+    // input
+    if (strcmp(lineptr, "\n") == 0) {
       break;
     }
+    stack[stack_i] = malloc(chars_read + 1); // chars read doesn't include \0
+    strncpy(stack[stack_i], lineptr, chars_read);
+    lineptr = NULL;
+    stack_i++;
 
-    if (bytes_read == -1) {
-      int err = errno;
-      fprintf(stderr, "error %d: could not read from file\n", err);
-      exit(1);
-    }
-    if (inputfd != STDIN_FILENO) {
-      lseek(inputfd, bytes_read, SEEK_CUR);
-    }
-
-    if (inputfd == STDIN_FILENO && bytes_read == 1 &&
-        buf[cur_buf_size] == '\n') {
-      stack_i -= 1; // decrementing stack pointer so we always point to last
-                    // item in stack
-      break;
-    }
-
-    char *ptr = malloc(bytes_read + 1); // strcpy needs size len(src) + 1 to
-                                        // insert null terminating character
-    if (ptr == NULL) {
-      int err = errno;
-      fprintf(stderr, "error %d: allocating read string\n", err);
-      exit(1);
-    }
-    strcpy(ptr, buf + cur_buf_size);
-
-    stack[stack_i++] = ptr;
+    // resize stack if it get full
     if (stack_i == stack_size) {
-      // TODO: double stack size and copy over memory to new stack
+      stack_size += STACK_SIZE_INC;
+      stack = realloc(stack, sizeof(char *) * stack_size);
+      if (stack == NULL) {
+        int err = errno;
+        fprintf(stderr, "error %d: reallocating stack\n", err);
+        exit(1);
+      }
     }
-    cur_buf_size = (cur_buf_size + bytes_read) % BUF_SIZE;
+  }
+  stack_i--; // stack pointer is one ahead of last item
+
+  if (in_file != stdin) {
+    fclose(in_file);
   }
 
   for (int i = (int)stack_i; i >= 0; i--) {
-    write(outputfd, stack[i], strlen(stack[i]));
+    if (out_file == stdout) {
+      printf("%s", stack[i]);
+    } else {
+      fputs(stack[i], out_file);
+    }
+  }
+
+  if (out_file != stdout) {
+    fclose(out_file);
   }
 
   return 0;
