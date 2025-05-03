@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #define BUF_SIZE 1024
@@ -12,7 +14,7 @@
 
 int main(int argc, char *argv[]) {
   if (argc > 3) {
-    printf("usage: reverse <input> <output>\n");
+    fprintf(stderr, "usage: reverse <input> <output>\n");
     exit(1);
   }
   FILE *in_file = stdin, *out_file = stdout;
@@ -20,22 +22,29 @@ int main(int argc, char *argv[]) {
   if (argc > 1) {
     in_file = fopen(argv[1], "r");
     if (in_file == NULL) {
-      fprintf(stderr, "error: cannot open file '%s'\n", argv[1]);
+      fprintf(stderr, "reverse: cannot open file '%s'\n", argv[1]);
       exit(1);
     }
   }
 
   if (argc > 2) {
-    // check for same file used as input and output
-    if (strcmp(argv[1], argv[2]) == 0) {
-      fprintf(stderr, "error: cannot use same file '%s' for input and output\n",
-              argv[1]);
+    // opening the file first incase it doesn't exists else the stat function
+    // will error
+    out_file = fopen(argv[2], "w");
+
+    // checking that the files are not the same by using inode numbers
+    struct stat sb1, sb2;
+    if (stat(argv[1], &sb1) == -1 || stat(argv[2], &sb2) == -1) {
+      fprintf(stderr, "reverse: error getting file stats\n");
+      exit(1);
+    }
+    if (sb1.st_ino == sb2.st_ino) {
+      fprintf(stderr, "reverse: input and output file must differ\n");
       exit(1);
     }
 
-    out_file = fopen(argv[2], "w");
     if (out_file == NULL) {
-      fprintf(stderr, "error: cannot open or create file '%s'\n", argv[2]);
+      fprintf(stderr, "reverse: cannot open file '%s'\n", argv[2]);
       exit(1);
     }
   }
